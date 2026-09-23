@@ -55,8 +55,8 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.52 0.1 190);
+    --primary-foreground: oklch(0.99 0.01 190);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
@@ -66,7 +66,7 @@
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --ring: oklch(0.62 0.1 190);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -90,8 +90,8 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    --primary: oklch(0.72 0.11 185);
+    --primary-foreground: oklch(0.2 0.03 190);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -101,7 +101,7 @@
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --ring: oklch(0.6 0.1 188);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -127,4 +127,36 @@
   html {
     @apply font-sans;
     }
+}
+/* Auth screens: brand panel and animated ECG trace */
+@layer components {
+  .auth-panel {
+    background:
+      radial-gradient(120% 80% at 0% 0%, oklch(0.5 0.1 185 / 0.9), transparent 60%),
+      radial-gradient(90% 70% at 100% 100%, oklch(0.42 0.09 230 / 0.9), transparent 60%),
+      oklch(0.27 0.05 210);
+  }
+  .auth-grid {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.05) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+  .ecg-trace {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: ecg-draw 3.2s ease-in-out infinite;
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+}
+
+@keyframes ecg-draw {
+  0% { stroke-dashoffset: 1; opacity: 1; }
+  60% { stroke-dashoffset: 0; opacity: 1; }
+  85%, 100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecg-trace { animation: none; stroke-dashoffset: 0; }
 }
