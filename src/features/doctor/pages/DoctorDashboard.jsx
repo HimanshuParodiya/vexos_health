@@ -1,63 +1,85 @@
-import { CalendarDays, ClipboardList, FlaskConical, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Clock, FlaskConical, RefreshCcw, Users } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { StatCard } from "@/components/common/StatCard";
+import { DashboardState } from "@/components/dashboard/DashboardState";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import { StatTile } from "@/components/dashboard/StatTile";
 import { useAuth } from "@/features/auth";
-
-// Placeholder data until the doctor API exists.
-const STATS = [
-  { label: "Today's appointments", value: 14, hint: "3 remaining this morning", icon: CalendarDays },
-  { label: "Active patients", value: 86, hint: "+4 this week", icon: Users },
-  { label: "Pending lab results", value: 7, hint: "2 flagged abnormal", icon: FlaskConical },
-  { label: "Notes to sign", value: 5, hint: "Oldest from yesterday", icon: ClipboardList },
-];
-
-const SCHEDULE = [
-  { time: "09:30", patient: "Anita Verma", reason: "Follow-up, hypertension", status: "Checked in" },
-  { time: "10:00", patient: "Karan Singh", reason: "Chest pain evaluation", status: "Waiting" },
-  { time: "10:45", patient: "Meera Nair", reason: "Post-op review", status: "Scheduled" },
-  { time: "11:30", patient: "Rohit Das", reason: "ECG results", status: "Scheduled" },
-];
+import { ConsultationsChart } from "@/features/doctor/components/ConsultationsChart";
+import { DiagnosesChart } from "@/features/doctor/components/DiagnosesChart";
+import { HourlyLoadChart } from "@/features/doctor/components/HourlyLoadChart";
+import { LabResultsTable } from "@/features/doctor/components/LabResultsTable";
+import { SchedulePanel } from "@/features/doctor/components/SchedulePanel";
+import { useDoctorDashboard } from "@/features/doctor/hooks/useDoctorDashboard";
+import { formatNumber, formatPercent } from "@/lib/format";
 
 export function DoctorDashboard() {
   const { user } = useAuth();
+  const [days, setDays] = useState(30);
+  const { data, isLoading, isRefetching, error, reload } = useDoctorDashboard(days);
+  const period = `previous ${days} days`;
 
   return (
     <>
       <PageHeader
         title={`Good day, ${user?.fullName ?? "Doctor"}`}
-        description="Here is your clinical overview for today."
+        description={`${user?.department ?? "Clinical"} · your practice at a glance`}
+        actions={<DateRangeFilter value={days} onChange={setDays} />}
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {STATS.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </div>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Today's schedule</CardTitle>
-          <CardDescription>Upcoming consultations</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-2">
-          {SCHEDULE.map((slot) => (
-            <div
-              key={slot.time}
-              className="flex flex-wrap items-center gap-4 rounded-lg border p-3"
-            >
-              <span className="w-14 font-mono text-sm text-muted-foreground">{slot.time}</span>
-              <div className="grid min-w-0 flex-1">
-                <span className="text-sm font-medium">{slot.patient}</span>
-                <span className="truncate text-xs text-muted-foreground">{slot.reason}</span>
-              </div>
-              <Badge variant={slot.status === "Checked in" ? "default" : "secondary"}>
-                {slot.status}
-              </Badge>
+      <DashboardState isLoading={isLoading} isRefetching={isRefetching} error={error} onRetry={reload}>
+        {data && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatTile
+                label="Patients seen"
+                icon={Users}
+                value={formatNumber(data.kpis.patientsSeen.current)}
+                current={data.kpis.patientsSeen.current}
+                previous={data.kpis.patientsSeen.previous}
+                periodLabel={period}
+                trend={data.kpis.patientsSeen.trend}
+              />
+              <StatTile
+                label="Avg. consultation time"
+                icon={Clock}
+                value={`${data.kpis.avgConsultMins.current} min`}
+                current={data.kpis.avgConsultMins.current}
+                previous={data.kpis.avgConsultMins.previous}
+                periodLabel="last month"
+                upIsGood={false}
+                trend={data.kpis.avgConsultMins.trend}
+              />
+              <StatTile
+                label="Pending lab results"
+                icon={FlaskConical}
+                value={data.kpis.pendingLabs.current}
+                footnote={`${data.kpis.pendingLabs.flagged} flagged abnormal or critical`}
+              />
+              <StatTile
+                label="Follow-up adherence"
+                icon={RefreshCcw}
+                value={formatPercent(data.kpis.followUpRate.current, 1)}
+                current={data.kpis.followUpRate.current}
+                previous={data.kpis.followUpRate.previous}
+                periodLabel={period}
+              />
             </div>
-          ))}
-        </CardContent>
-      </Card>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <ConsultationsChart data={data.consultations} days={days} />
+              <DiagnosesChart data={data.diagnoses} />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <LabResultsTable results={data.labResults} />
+              <HourlyLoadChart data={data.hourlyLoad} />
+            </div>
+
+            <SchedulePanel schedule={data.schedule} />
+          </>
+        )}
+      </DashboardState>
     </>
   );
 }

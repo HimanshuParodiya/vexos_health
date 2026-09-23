@@ -1,58 +1,88 @@
-import { Building2, ShieldAlert, UserCheck, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { BedDouble, IndianRupee, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { StatCard } from "@/components/common/StatCard";
-import { ROLE_CONFIG } from "@/config/roles";
-
-// Placeholder data until the admin API exists.
-const STATS = [
-  { label: "Total staff", value: 248, hint: "112 doctors, 136 nurses", icon: Users },
-  { label: "Pending verifications", value: 4, hint: "License checks", icon: UserCheck },
-  { label: "Departments", value: 11, icon: Building2 },
-  { label: "Security events", value: 0, hint: "Last 24 hours", icon: ShieldAlert },
-];
-
-const PENDING = [
-  { name: "Dr. Vikram Joshi", role: "doctor", license: "NMC-448120", department: "Neurology" },
-  { name: "Sneha Pillai", role: "nurse", license: "RN-302215", department: "Pediatrics" },
-  { name: "Dr. Neha Kapoor", role: "doctor", license: "NMC-551907", department: "Oncology" },
-];
+import { DashboardState } from "@/components/dashboard/DashboardState";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import { StatTile } from "@/components/dashboard/StatTile";
+import { AuditLogTable } from "@/features/admin/components/AuditLogTable";
+import { PatientFlowChart } from "@/features/admin/components/PatientFlowChart";
+import { PayerMixCard } from "@/features/admin/components/PayerMixCard";
+import { RevenueChart } from "@/features/admin/components/RevenueChart";
+import { StaffingChart } from "@/features/admin/components/StaffingChart";
+import { VerificationQueue } from "@/features/admin/components/VerificationQueue";
+import { useAdminDashboard } from "@/features/admin/hooks/useAdminDashboard";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 
 export function AdminDashboard() {
+  const [days, setDays] = useState(30);
+  const { data, isLoading, isRefetching, error, reload } = useAdminDashboard(days);
+  const period = `previous ${days} days`;
+
   return (
     <>
-      <PageHeader title="Administration" description="Staff access and system health." />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {STATS.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </div>
+      <PageHeader
+        title="Hospital overview"
+        description="Operations, staffing and access control"
+        actions={<DateRangeFilter value={days} onChange={setDays} />}
+      />
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Pending account verifications</CardTitle>
-          <CardDescription>Confirm registration numbers before granting access</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-2">
-          {PENDING.map((person) => (
-            <div
-              key={person.license}
-              className="flex flex-wrap items-center gap-4 rounded-lg border p-3"
-            >
-              <div className="grid min-w-0 flex-1">
-                <span className="text-sm font-medium">{person.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {person.department} · {person.license}
-                </span>
-              </div>
-              <Badge variant="secondary">{ROLE_CONFIG[person.role].label}</Badge>
-              <Button size="sm" variant="outline">Review</Button>
+      <DashboardState isLoading={isLoading} isRefetching={isRefetching} error={error} onRetry={reload}>
+        {data && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatTile
+                label="Revenue"
+                icon={IndianRupee}
+                value={formatCurrency(data.kpis.revenue.current)}
+                current={data.kpis.revenue.current}
+                previous={data.kpis.revenue.previous}
+                periodLabel={period}
+                trend={data.kpis.revenue.trend}
+              />
+              <StatTile
+                label="Bed occupancy"
+                icon={BedDouble}
+                value={formatPercent(data.kpis.bedOccupancy.current, 1)}
+                current={data.kpis.bedOccupancy.current}
+                previous={data.kpis.bedOccupancy.previous}
+                periodLabel="last month"
+                trend={data.kpis.bedOccupancy.trend}
+              />
+              <StatTile
+                label="Avg. ER wait time"
+                icon={Timer}
+                value={`${data.kpis.erWaitMins.current} min`}
+                current={data.kpis.erWaitMins.current}
+                previous={data.kpis.erWaitMins.previous}
+                periodLabel="last month"
+                upIsGood={false}
+                trend={data.kpis.erWaitMins.trend}
+              />
+              <StatTile
+                label="Clinical staff"
+                icon={Users}
+                value={formatNumber(data.kpis.totalStaff.current)}
+                footnote={`${data.kpis.totalStaff.doctors} doctors · ${data.kpis.totalStaff.nurses} nurses`}
+              />
             </div>
-          ))}
-        </CardContent>
-      </Card>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <PatientFlowChart data={data.patientFlow} days={days} />
+              <StaffingChart data={data.staffing} />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <RevenueChart data={data.monthlyRevenue} />
+              <PayerMixCard data={data.payerMix} />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <AuditLogTable entries={data.auditLog} />
+              <VerificationQueue items={data.verifications} />
+            </div>
+          </>
+        )}
+      </DashboardState>
     </>
   );
 }

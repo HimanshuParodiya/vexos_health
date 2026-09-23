@@ -1,57 +1,77 @@
 import { Activity, AlertTriangle, BedDouble, Pill } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/PageHeader";
-import { StatCard } from "@/components/common/StatCard";
+import { DashboardState } from "@/components/dashboard/DashboardState";
+import { StatTile } from "@/components/dashboard/StatTile";
 import { useAuth } from "@/features/auth";
-
-// Placeholder data until the nurse API exists.
-const STATS = [
-  { label: "Assigned beds", value: 12, hint: "Ward B, east wing", icon: BedDouble },
-  { label: "Vitals due", value: 6, hint: "Next round at 14:00", icon: Activity },
-  { label: "Medications due", value: 9, hint: "Within the next hour", icon: Pill },
-  { label: "Alerts", value: 2, hint: "Needs attention", icon: AlertTriangle },
-];
-
-const TASKS = [
-  { bed: "B-04", patient: "Suresh Iyer", task: "Record vitals", due: "13:45", urgent: true },
-  { bed: "B-07", patient: "Fatima Khan", task: "IV antibiotics", due: "14:00", urgent: false },
-  { bed: "B-11", patient: "Arjun Patel", task: "Wound dressing", due: "14:30", urgent: false },
-];
+import { CareTasks } from "@/features/nurse/components/CareTasks";
+import { MedRoundsChart } from "@/features/nurse/components/MedRoundsChart";
+import { PatientAcuityTable } from "@/features/nurse/components/PatientAcuityTable";
+import { VitalsPanel } from "@/features/nurse/components/VitalsPanel";
+import { WardOccupancyCard } from "@/features/nurse/components/WardOccupancyCard";
+import { useNurseDashboard } from "@/features/nurse/hooks/useNurseDashboard";
+import { formatPercent, formatTime } from "@/lib/format";
 
 export function NurseDashboard() {
   const { user } = useAuth();
+  const { data, isLoading, isRefetching, error, reload } = useNurseDashboard();
 
   return (
     <>
       <PageHeader
         title={`Welcome, ${user?.fullName ?? "Nurse"}`}
-        description="Your shift at a glance."
+        description={
+          data
+            ? `${data.shift.name} · ${formatTime(data.shift.start)} – ${formatTime(data.shift.end)} · ${user?.department ?? ""}`
+            : "Your shift at a glance"
+        }
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {STATS.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </div>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Care tasks</CardTitle>
-          <CardDescription>Ordered by due time</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-2">
-          {TASKS.map((item) => (
-            <div key={item.bed} className="flex flex-wrap items-center gap-4 rounded-lg border p-3">
-              <span className="w-12 font-mono text-sm text-muted-foreground">{item.bed}</span>
-              <div className="grid min-w-0 flex-1">
-                <span className="text-sm font-medium">{item.task}</span>
-                <span className="truncate text-xs text-muted-foreground">{item.patient}</span>
-              </div>
-              <Badge variant={item.urgent ? "destructive" : "secondary"}>Due {item.due}</Badge>
+      <DashboardState isLoading={isLoading} isRefetching={isRefetching} error={error} onRetry={reload}>
+        {data && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatTile
+                label="Assigned patients"
+                icon={BedDouble}
+                value={`${data.kpis.assignedPatients.current}/${data.kpis.assignedPatients.capacity}`}
+                footnote="Beds assigned this shift"
+              />
+              <StatTile
+                label="Vitals recorded"
+                icon={Activity}
+                value={`${data.kpis.vitalsRecorded.current}/${data.kpis.vitalsRecorded.due}`}
+                footnote={`${data.kpis.vitalsRecorded.due - data.kpis.vitalsRecorded.current} observations still due`}
+              />
+              <StatTile
+                label="Medications on time"
+                icon={Pill}
+                value={formatPercent(data.kpis.medsOnTime.current, 1)}
+                current={data.kpis.medsOnTime.current}
+                previous={data.kpis.medsOnTime.previous}
+                periodLabel="last shift"
+              />
+              <StatTile
+                label="Active alerts"
+                icon={AlertTriangle}
+                value={data.kpis.activeAlerts.current}
+                footnote={`${data.kpis.activeAlerts.critical} critical NEWS2 score`}
+              />
             </div>
-          ))}
-        </CardContent>
-      </Card>
+
+            <VitalsPanel patients={data.patients} vitals={data.vitals} />
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <PatientAcuityTable patients={data.patients} />
+              <CareTasks tasks={data.tasks} />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <MedRoundsChart data={data.medRounds} />
+              <WardOccupancyCard wards={data.wardOccupancy} />
+            </div>
+          </>
+        )}
+      </DashboardState>
     </>
   );
 }
