@@ -1,11 +1,12 @@
-import { useState } from "react";
-import heroImg from "./assets/hero.png";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
 import "./App.css";
+import { Button } from "./components/ui/button";
 
 function App() {
-  return <h1 className="text-red-500">Let's get started!</h1>;
+  return (
+    <div className="p-10">
+      <Button>Click me</Button>
+    </div>
+  );
 }
 
 export default App;
