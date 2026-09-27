@@ -3,8 +3,10 @@ import { SIGNUP_ROLES } from "@/config/roles";
 
 const email = z.string().trim().min(1, "Email is required").email("Enter a valid email address");
 
+const usernameOrEmail = z.string().trim().min(1, "Username or email is required");
+
 export const loginSchema = z.object({
-  email,
+  email: usernameOrEmail,
   password: z.string().min(1, "Password is required"),
   rememberDevice: z.boolean().optional(),
 });

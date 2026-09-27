@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, Sparkles, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { env } from "@/config/env";
 import { getDashboardPath } from "@/config/roles";
-import { ROUTES } from "@/config/routes";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { loginSchema } from "@/features/auth/schemas/auth.schemas";
 import { applyServerErrors } from "@/features/auth/utils/form-errors";
@@ -33,7 +32,7 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "", rememberDevice: false },
+    defaultValues: { email: env.devUsername || "frontend_dev", password: "", rememberDevice: false },
   });
 
   const rememberDevice = useWatch({ control, name: "rememberDevice" });
@@ -58,6 +57,10 @@ export function LoginForm() {
     setValue("password", account.password, { shouldValidate: true });
   };
 
+  const fillVexosDev = () => {
+    setValue("email", "frontend_dev", { shouldValidate: true });
+  };
+
   return (
     <div className="grid gap-6">
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-5">
@@ -67,18 +70,41 @@ export function LoginForm() {
             className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
           >
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            {formError}
+            <div>
+              <p className="font-medium">{formError}</p>
+              {formError.includes("Incorrect username or password") && (
+                <p className="mt-1 text-xs opacity-90">
+                  Please verify your credentials for the <code>frontend_dev</code> account.
+                </p>
+              )}
+            </div>
           </div>
         )}
 
-        <FormField id="email" label="Work email" error={errors.email?.message}>
+        {!env.useMockApi && (
+          <div className="flex items-center justify-between rounded-lg border border-teal-500/20 bg-teal-500/5 p-3 text-xs text-teal-700 dark:text-teal-300">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+              <span>Connecting to live ICU Backend</span>
+            </div>
+            <button
+              type="button"
+              onClick={fillVexosDev}
+              className="inline-flex items-center gap-1 font-semibold text-teal-700 hover:underline dark:text-teal-300 cursor-pointer"
+            >
+              <UserCheck className="size-3.5" /> frontend_dev
+            </button>
+          </div>
+        )}
+
+        <FormField id="email" label="Username or work email" error={errors.email?.message}>
           {(field) => (
             <Input
               {...field}
               {...register("email")}
-              type="email"
+              type="text"
               autoComplete="username"
-              placeholder="name@hospital.org"
+              placeholder="frontend_dev or nurse@hospital.org"
               className="h-11"
             />
           )}
@@ -132,10 +158,7 @@ export function LoginForm() {
       {env.useMockApi && <DemoAccounts onSelect={fillDemo} />}
 
       <p className="text-center text-sm text-muted-foreground">
-        New to the care team?{" "}
-        <Link to={ROUTES.SIGNUP} className="font-medium text-primary hover:underline">
-          Request an account
-        </Link>
+        Hospital ICU Telemetry System · VEXOS v0.1.0
       </p>
     </div>
   );
