@@ -254,21 +254,22 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[#14171d] text-slate-100 rounded-xl overflow-hidden border border-slate-800 shadow-2xl transition-all ${
-        isFullscreen ? "fixed inset-0 z-50 rounded-none" : "min-h-[820px]"
-      }`}
+      className={`flex flex-col bg-[#14171d] text-slate-100 rounded-xl overflow-hidden border border-slate-800 shadow-2xl transition-all  min-h-0 ${isFullscreen
+        ? "fixed inset-0 z-50 rounded-none h-screen"
+        : "h-[calc(100vh-187px)]"
+        }`}
     >
-      {/* 1. TOP CEIBA / VEXOS CLINICAL NAVIGATION BAR */}
-      <div className="bg-[#240b3b] border-b border-purple-900/60 px-4 py-2 flex items-center justify-between text-xs text-purple-200">
+      {/* 1. TOP VEXOS / VEXOS CLINICAL NAVIGATION BAR */}
+      <div className="bg-[#240b3b] hidden border-b border-purple-900/60 px-4 py-2 flex items-center justify-between text-xs text-purple-200">
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-0.5">
           <div className="flex items-center gap-1.5 font-bold text-white tracking-wide pr-3 border-r border-purple-800">
             <span className="flex size-6 items-center justify-center rounded bg-purple-600 text-white font-black text-sm">
               V
             </span>
-            <span className="text-sm font-semibold tracking-tight text-white">VEXOS eClinics</span>
+            <span className="text-sm font-semibold tracking-tight text-white">Vexos </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* <div className="flex items-center gap-3">
             {[
               "CMS Prime",
               "Digital CMU",
@@ -285,16 +286,15 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               <button
                 key={navItem}
                 type="button"
-                className={`whitespace-nowrap px-2 py-1 rounded transition-colors ${
-                  navItem === "Nurse"
-                    ? "bg-purple-800/80 font-bold text-white shadow-sm"
-                    : "hover:bg-purple-900/50 hover:text-white text-purple-300"
-                }`}
+                className={`whitespace-nowrap px-2 py-1 rounded transition-colors ${navItem === "Nurse"
+                  ? "bg-purple-800/80 font-bold text-white shadow-sm"
+                  : "hover:bg-purple-900/50 hover:text-white text-purple-300"
+                  }`}
               >
                 {navItem}
               </button>
             ))}
-          </div>
+          </div> */}
         </div>
 
         <div className="flex items-center gap-3 shrink-0 pl-4 border-l border-purple-800">
@@ -386,11 +386,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             type="button"
             title="Toggle Ventilator Section"
             onClick={() => setActiveTab((prev) => (prev === "VENTILATOR" ? "MONITOR" : "VENTILATOR"))}
-            className={`p-1.5 rounded border ${
-              activeTab === "VENTILATOR"
-                ? "bg-purple-700 text-white border-purple-500"
-                : "bg-purple-950/60 text-purple-300 border-purple-800 hover:text-white"
-            }`}
+            className={`p-1.5 rounded border ${activeTab === "VENTILATOR"
+              ? "bg-purple-700 text-white border-purple-500"
+              : "bg-purple-950/60 text-purple-300 border-purple-800 hover:text-white"
+              }`}
           >
             <Wind className="size-4" />
           </button>
@@ -434,18 +433,16 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
           {/* Live Telemetry Beacon */}
           <div
             title={lastMessageAt ? `Last packet: ${new Date(lastMessageAt).toLocaleTimeString()}` : "Listening for telemetry..."}
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs ${
-              isConnected
-                ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
-                : isConnecting
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs ${isConnected
+              ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+              : isConnecting
                 ? "bg-amber-950/60 border-amber-500/50 text-amber-300"
                 : "bg-rose-950/60 border-rose-500/50 text-rose-300"
-            }`}
+              }`}
           >
             <span
-              className={`size-2 rounded-full ${
-                isConnected ? "bg-emerald-400 animate-ping" : isConnecting ? "bg-amber-400" : "bg-rose-400"
-              }`}
+              className={`size-2 rounded-full ${isConnected ? "bg-emerald-400 animate-ping" : isConnecting ? "bg-amber-400" : "bg-rose-400"
+                }`}
             />
             <span className="font-medium tracking-tight">
               {isConnected ? "LIVE TELEMETRY STREAM" : isConnecting ? "Connecting Live Stream…" : "Offline / Click Reconnect"}
@@ -477,7 +474,7 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
       </div>
 
       {/* 4. CLINICAL FLOWSHEET MATRIX GRID */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Left Vertical Section Rail */}
         <div className="w-8 shrink-0 bg-[#1e232d] border-r border-slate-800 flex flex-col items-center justify-between py-4 select-none">
           <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
@@ -489,8 +486,8 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
         </div>
 
         {/* Scrollable Matrix Table Container */}
-        <div ref={scrollWrapperRef} className="flex-1 overflow-x-auto overflow-y-auto relative no-scrollbar">
-          <table className="w-full border-collapse text-xs select-none">
+        <div ref={scrollWrapperRef} className="flex-1 w-0 min-w-0 min-h-0 max-w-full overflow-x-auto overflow-y-auto relative no-scrollbar">
+          <table className="min-w-max w-full border-collapse text-xs select-none">
             {/* Header Dates Row */}
             <thead>
               <tr className="bg-[#1e232d] text-slate-300 font-semibold border-b border-slate-700/80 sticky top-0 z-20">
@@ -516,9 +513,8 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                 {matrixData.map((slot) => (
                   <th
                     key={slot.key}
-                    className={`min-w-[72px] px-1 py-1.5 text-center border-r border-slate-800 font-mono ${
-                      slot.isLatest ? "bg-[#3b1263] text-white font-bold" : "text-slate-300"
-                    }`}
+                    className={`min-w-[72px] px-1 py-1.5 text-center border-r border-slate-800 font-mono ${slot.isLatest ? "bg-[#3b1263] text-white font-bold" : "text-slate-300"
+                      }`}
                   >
                     <div className="flex flex-col items-center">
                       <span>{slot.timeStr}</span>
@@ -597,11 +593,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                   return (
                     <td key={slot.key} className="px-1 py-1 text-center border-r border-slate-800/70">
                       <div
-                        className={`inline-block px-1.5 py-0.5 rounded ${
-                          isHigh
-                            ? "border border-red-600/80 bg-red-950/40 text-red-500 font-bold"
-                            : "text-slate-400"
-                        }`}
+                        className={`inline-block px-1.5 py-0.5 rounded ${isHigh
+                          ? "border border-red-600/80 bg-red-950/40 text-red-500 font-bold"
+                          : "text-slate-400"
+                          }`}
                       >
                         {slot.temperature}
                       </div>
@@ -642,11 +637,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                       type="button"
                       onClick={() => handleApprove(slot.key)}
                       title={`Approve ${slot.timeStr}`}
-                      className={`inline-flex items-center justify-center size-5 rounded transition-all cursor-pointer ${
-                        slot.isApproved
-                          ? "bg-emerald-500 text-white shadow-sm"
-                          : "bg-emerald-600/70 hover:bg-emerald-500 text-white"
-                      }`}
+                      className={`inline-flex items-center justify-center size-5 rounded transition-all cursor-pointer ${slot.isApproved
+                        ? "bg-emerald-500 text-white shadow-sm"
+                        : "bg-emerald-600/70 hover:bg-emerald-500 text-white"
+                        }`}
                     >
                       <Check className="size-3.5 stroke-[3]" />
                     </button>
@@ -677,9 +671,8 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                 {matrixData.map((slot) => (
                   <th
                     key={`vent_${slot.key}`}
-                    className={`min-w-[72px] px-1 py-1 text-center border-r border-purple-950/70 font-mono text-[10px] ${
-                      slot.isLatest ? "bg-[#45166f] text-white font-bold" : "text-purple-300/80"
-                    }`}
+                    className={`min-w-[72px] px-1 py-1 text-center border-r border-purple-950/70 font-mono text-[10px] ${slot.isLatest ? "bg-[#45166f] text-white font-bold" : "text-purple-300/80"
+                      }`}
                   >
                     {slot.timeStr}
                   </th>
@@ -713,7 +706,7 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
       {/* 6. CLINICAL FOOTER */}
       <div className="bg-[#181a20] border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-[11px] text-slate-400">
         <div>
-          <span>© 2026 CEIBA Health · All Rights Reserved</span>
+          <span>© 2026 VEXOS Health · All Rights Reserved</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="font-medium text-slate-300">Saint Joseph Medical Center</span>
@@ -741,9 +734,8 @@ function FlowsheetRow({ label, data, field, highlightBold = false, muted = false
         return (
           <td
             key={slot.key}
-            className={`px-1 py-1 text-center border-r border-slate-800/70 transition-all ${
-              isLatest && isLatestPulse ? "bg-purple-900/40 text-purple-200" : ""
-            } ${highlightBold ? "font-bold text-slate-200" : muted ? "text-slate-500" : "text-slate-300"}`}
+            className={`px-1 py-1 text-center border-r border-slate-800/70 transition-all ${isLatest && isLatestPulse ? "bg-purple-900/40 text-purple-200" : ""
+              } ${highlightBold ? "font-bold text-slate-200" : muted ? "text-slate-500" : "text-slate-300"}`}
           >
             {val !== "" && val !== undefined && val !== null ? val : "—"}
           </td>
