@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { useVitalsWebSocket } from "../hooks/useVitalsWebSocket";
 import { vexosApi } from "@/services/vexos-api";
+import { cn } from "@/lib/utils";
 
 // 24-hour column generation helper based on target date
 function generateTimelineSlots(baseDate = new Date()) {
@@ -254,93 +255,39 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[#14171d] text-slate-100 rounded-xl overflow-hidden border border-slate-800 shadow-2xl transition-all  min-h-0 ${isFullscreen
-        ? "fixed inset-0 z-50 rounded-none h-screen"
-        : "h-[calc(100vh-187px)]"
-        }`}
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-all",
+        isFullscreen ? "fixed inset-0 z-50 h-screen rounded-none" : "h-[calc(100vh-187px)]"
+      )}
     >
-      {/* 1. TOP VEXOS / VEXOS CLINICAL NAVIGATION BAR */}
-      <div className="bg-[#240b3b] hidden border-b border-purple-900/60 px-4 py-2 flex items-center justify-between text-xs text-purple-200">
-        <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-0.5">
-          <div className="flex items-center gap-1.5 font-bold text-white tracking-wide pr-3 border-r border-purple-800">
-            <span className="flex size-6 items-center justify-center rounded bg-purple-600 text-white font-black text-sm">
-              V
-            </span>
-            <span className="text-sm font-semibold tracking-tight text-white">Vexos </span>
-          </div>
-
-          {/* <div className="flex items-center gap-3">
-            {[
-              "CMS Prime",
-              "Digital CMU",
-              "Population Management",
-              "Patient Timeline",
-              "Admission",
-              "Patient",
-              "Doctor",
-              "Nurse",
-              "Report",
-              "Patient List View",
-              "Alarm Command Center",
-            ].map((navItem) => (
-              <button
-                key={navItem}
-                type="button"
-                className={`whitespace-nowrap px-2 py-1 rounded transition-colors ${navItem === "Nurse"
-                  ? "bg-purple-800/80 font-bold text-white shadow-sm"
-                  : "hover:bg-purple-900/50 hover:text-white text-purple-300"
-                  }`}
-              >
-                {navItem}
-              </button>
-            ))}
-          </div> */}
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0 pl-4 border-l border-purple-800">
-          <button
-            type="button"
-            className="rounded bg-purple-900/70 hover:bg-purple-800 px-2 py-1 font-semibold text-purple-100 border border-purple-700/50"
-          >
-            NEED HELP
-          </button>
-          <div className="flex items-center gap-1.5 text-slate-300">
-            <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-medium text-white">Nurse Chaitanya JSK</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. CLINICAL CONTEXT & PATIENT BANNER (DEEP PURPLE) */}
-      <div className="bg-[#2c124d] border-b border-purple-950 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-white">
+      {/* 1. CLINICAL CONTEXT & PATIENT BANNER */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-            Data Validation & Entry
-          </h1>
+          <h1 className="font-heading text-base font-semibold tracking-tight">Data Validation & Entry</h1>
 
           {/* Quick Clinical Tool Icons */}
-          <div className="hidden sm:flex items-center gap-1 bg-purple-950/60 p-1 rounded-lg border border-purple-800/50">
-            <button type="button" title="PACS" className="p-1.5 hover:bg-purple-800 rounded text-purple-300 hover:text-white">
+          <div className="hidden items-center gap-1 rounded-lg border bg-muted/50 p-1 sm:flex">
+            <button type="button" title="PACS" className={ICON_BUTTON}>
               <Video className="size-4" />
             </button>
-            <span className="text-[10px] font-bold text-purple-400 px-1">PACS</span>
-            <button type="button" title="ECG Waveform" className="p-1.5 hover:bg-purple-800 rounded text-purple-300 hover:text-white">
+            <span className="px-1 text-[10px] font-semibold text-muted-foreground">PACS</span>
+            <button type="button" title="ECG Waveform" className={ICON_BUTTON}>
               <Activity className="size-4" />
             </button>
-            <button type="button" title="Stethoscope" className="p-1.5 hover:bg-purple-800 rounded text-purple-300 hover:text-white">
+            <button type="button" title="Stethoscope" className={ICON_BUTTON}>
               <Stethoscope className="size-4" />
             </button>
-            <button type="button" title="Medications" className="p-1.5 hover:bg-purple-800 rounded text-purple-300 hover:text-white">
+            <button type="button" title="Medications" className={ICON_BUTTON}>
               <Pill className="size-4" />
             </button>
-            <button type="button" title="Infusion/Syringe" className="p-1.5 hover:bg-purple-800 rounded text-purple-300 hover:text-white">
+            <button type="button" title="Infusion/Syringe" className={ICON_BUTTON}>
               <Syringe className="size-4" />
             </button>
           </div>
         </div>
 
         {/* Center Patient Banner */}
-        <div className="flex items-center gap-3 bg-purple-950/70 border border-purple-800/60 rounded-lg px-3 py-1.5 text-xs text-purple-100 flex-1 max-w-2xl justify-between">
+        <div className="flex max-w-2xl flex-1 items-center justify-between gap-3 rounded-lg border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-3 overflow-hidden">
             {/* Bed Switcher Dropdown */}
             <div className="relative flex items-center">
@@ -351,7 +298,7 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                   setSelectedBedId(e.target.value);
                   onSelectBed?.(e.target.value);
                 }}
-                className="bg-purple-900 border border-purple-700 font-bold text-white rounded px-2 py-0.5 text-xs focus:ring-1 focus:ring-purple-400 cursor-pointer"
+                className="cursor-pointer rounded-md border border-input bg-background px-2 py-0.5 text-xs font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 {beds.map((b) => (
                   <option key={b.bed_id} value={b.bed_id}>
@@ -360,22 +307,22 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                 ))}
               </select>
               {loadingPatientData && (
-                <span className="size-2 rounded-full border border-purple-300 border-t-transparent animate-spin ml-1" />
+                <span className="ml-1 size-2 animate-spin rounded-full border border-primary border-t-transparent" />
               )}
             </div>
 
-            <div className="truncate font-semibold text-white">
+            <div className="truncate font-semibold text-foreground">
               {bed.patient?.name || "Jessica Marie Farley"}, {bed.age || 55}y
             </div>
-            <span className="text-purple-300">MRN: <strong className="text-white">{bed.patient?.mrn || "123"}</strong></span>
-            <span className="text-purple-300">FIN: -</span>
-            <span className="text-purple-300">{bed.patient?.gender === "U" ? "Female" : bed.patient?.gender || "Female"}</span>
-            <span className="text-purple-300">Bed: <strong className="text-white">{bed.bed_id}</strong></span>
-            <span className="text-purple-300">LOS: <strong className="text-white">{bed.length_of_stay || "966"}</strong></span>
-            <span className="hidden xl:inline text-purple-300 truncate">Relative: 83993739404</span>
+            <span>MRN: <strong className="font-medium text-foreground">{bed.patient?.mrn || "123"}</strong></span>
+            <span>FIN: -</span>
+            <span>{bed.patient?.gender === "U" ? "Female" : bed.patient?.gender || "Female"}</span>
+            <span>Bed: <strong className="font-medium text-foreground">{bed.bed_id}</strong></span>
+            <span>LOS: <strong className="font-medium text-foreground">{bed.length_of_stay || "966"}</strong></span>
+            <span className="hidden truncate xl:inline">Relative: 83993739404</span>
           </div>
 
-          <button type="button" title="Edit Clinical Notes" className="p-1 hover:text-white text-purple-300">
+          <button type="button" title="Edit Clinical Notes" className="p-1 hover:text-foreground">
             <Edit2 className="size-3.5" />
           </button>
         </div>
@@ -386,10 +333,12 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             type="button"
             title="Toggle Ventilator Section"
             onClick={() => setActiveTab((prev) => (prev === "VENTILATOR" ? "MONITOR" : "VENTILATOR"))}
-            className={`p-1.5 rounded border ${activeTab === "VENTILATOR"
-              ? "bg-purple-700 text-white border-purple-500"
-              : "bg-purple-950/60 text-purple-300 border-purple-800 hover:text-white"
-              }`}
+            className={cn(
+              "rounded-md border p-1.5 transition-colors",
+              activeTab === "VENTILATOR"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
           >
             <Wind className="size-4" />
           </button>
@@ -397,34 +346,34 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             type="button"
             title="Fullscreen"
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1.5 rounded bg-purple-950/60 hover:bg-purple-800 text-purple-300 hover:text-white border border-purple-800"
+            className="rounded-md border bg-background p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </button>
         </div>
       </div>
 
-      {/* 3. TOOLBAR: DATE FILTER, LIVE INDICATOR, BACK TO NOW, EXPORT CSV */}
-      <div className="bg-[#1b1e25] border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+      {/* 2. TOOLBAR: DATE FILTER, LIVE INDICATOR, BACK TO NOW, EXPORT CSV */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-2.5 text-xs">
         <div className="flex items-center gap-3">
-          <span className="font-semibold text-slate-300">Filter by Date:</span>
+          <span className="font-medium text-muted-foreground">Filter by Date:</span>
           <div className="flex items-center gap-1.5">
             <input
               type="text"
               aria-label="Filter by Date"
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
-              className="bg-[#242933] border border-slate-700 rounded px-2.5 py-1 text-slate-200 text-xs w-44 font-mono focus:outline-none focus:border-purple-500"
+              className="w-44 rounded-md border border-input bg-background px-2.5 py-1 text-xs tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             />
             <button
               type="button"
               onClick={scrollToLatest}
-              className="flex items-center gap-1 bg-[#4c1d95] hover:bg-[#5b21b6] text-white px-3 py-1 rounded font-medium shadow-sm transition-all"
+              className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
             >
               <RotateCcw className="size-3.5" />
               Back to Now
             </button>
-            <Info className="size-4 text-slate-400 hover:text-slate-200 cursor-pointer" />
+            <Info className="size-4 cursor-pointer text-muted-foreground hover:text-foreground" />
           </div>
         </div>
 
@@ -433,26 +382,26 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
           {/* Live Telemetry Beacon */}
           <div
             title={lastMessageAt ? `Last packet: ${new Date(lastMessageAt).toLocaleTimeString()}` : "Listening for telemetry..."}
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs ${isConnected
-              ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
-              : isConnecting
-                ? "bg-amber-950/60 border-amber-500/50 text-amber-300"
-                : "bg-rose-950/60 border-rose-500/50 text-rose-300"
-              }`}
+            className={cn(
+              "flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium",
+              isConnected
+                ? "bg-status-good/10 text-status-good"
+                : isConnecting
+                  ? "bg-status-warning/15 text-amber-700 dark:text-status-warning"
+                  : "bg-status-critical/10 text-status-critical"
+            )}
           >
             <span
-              className={`size-2 rounded-full ${isConnected ? "bg-emerald-400 animate-ping" : isConnecting ? "bg-amber-400" : "bg-rose-400"
-                }`}
+              className={cn(
+                "size-2 rounded-full",
+                isConnected ? "animate-ping bg-status-good" : isConnecting ? "bg-status-warning" : "bg-status-critical"
+              )}
             />
-            <span className="font-medium tracking-tight">
+            <span className="tracking-tight">
               {isConnected ? "LIVE TELEMETRY STREAM" : isConnecting ? "Connecting Live Stream…" : "Offline / Click Reconnect"}
             </span>
             {!isConnected && (
-              <button
-                type="button"
-                onClick={reconnect}
-                className="hover:underline font-bold text-xs ml-1 cursor-pointer"
-              >
+              <button type="button" onClick={reconnect} className="ml-1 cursor-pointer font-semibold hover:underline">
                 Reconnect
               </button>
             )}
@@ -461,44 +410,44 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
           <button
             type="button"
             onClick={handleExportCsv}
-            className="flex items-center gap-1.5 bg-[#252a36] hover:bg-[#313746] text-slate-200 border border-slate-700 px-3 py-1 rounded font-medium shadow-sm transition-colors"
+            className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-1 font-medium shadow-xs transition-colors hover:bg-accent"
           >
-            <FileSpreadsheet className="size-3.5 text-emerald-400" />
+            <FileSpreadsheet className="size-3.5 text-status-good" />
             Export as CSV
           </button>
 
-          <button type="button" className="p-1 text-slate-400 hover:text-slate-200" title="Table Settings">
+          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" title="Table Settings">
             <Settings className="size-4" />
           </button>
         </div>
       </div>
 
-      {/* 4. CLINICAL FLOWSHEET MATRIX GRID */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      {/* 3. CLINICAL FLOWSHEET MATRIX GRID */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left Vertical Section Rail */}
-        <div className="w-8 shrink-0 bg-[#1e232d] border-r border-slate-800 flex flex-col items-center justify-between py-4 select-none">
-          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+        <div className="flex w-8 shrink-0 select-none flex-col items-center justify-between border-r bg-muted/40 py-4">
+          <span className="rotate-180 text-[10px] font-semibold uppercase tracking-widest text-primary [writing-mode:vertical-rl]">
             ◀ MONITOR ▶
           </span>
-          <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider [writing-mode:vertical-rl] rotate-180">
+          <span className="rotate-180 text-[9px] font-medium uppercase tracking-wider text-muted-foreground [writing-mode:vertical-rl]">
             Patient Details
           </span>
         </div>
 
         {/* Scrollable Matrix Table Container */}
-        <div ref={scrollWrapperRef} className="flex-1 w-0 min-w-0 min-h-0 max-w-full overflow-x-auto overflow-y-auto relative no-scrollbar">
-          <table className="min-w-max w-full border-collapse text-xs select-none">
+        <div ref={scrollWrapperRef} className="no-scrollbar relative w-0 min-w-0 max-w-full min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+          <table className="w-full min-w-max select-none border-collapse text-xs">
             {/* Header Dates Row */}
             <thead>
-              <tr className="bg-[#1e232d] text-slate-300 font-semibold border-b border-slate-700/80 sticky top-0 z-20">
-                <th className="sticky left-0 z-30 bg-[#1e232d] px-3 py-1.5 text-left border-r border-slate-800 w-44 font-bold text-slate-300">
+              <tr className="sticky top-0 z-20 border-b bg-muted font-medium text-muted-foreground">
+                <th className="sticky left-0 z-30 w-44 border-r bg-muted px-3 py-1.5 text-left font-semibold text-foreground">
                   TYPES
                 </th>
                 {dateGroups.map((group) => (
                   <th
                     key={group.dateStr}
                     colSpan={group.count}
-                    className="border-r border-slate-700 text-center py-1 text-[11px] font-mono tracking-wider bg-[#222733] text-purple-200 border-b border-slate-800"
+                    className="border-r border-b py-1 text-center text-[11px] font-medium tabular-nums tracking-wider text-foreground"
                   >
                     {group.dateStr}
                   </th>
@@ -506,20 +455,22 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               </tr>
 
               {/* Time Slots Row */}
-              <tr className="bg-[#1b1e25] text-slate-400 text-[11px] font-mono border-b border-slate-800 sticky top-7 z-20">
-                <th className="sticky left-0 z-30 bg-[#1b1e25] px-3 py-1 text-left border-r border-slate-800 text-[10px] text-slate-400 uppercase font-semibold">
+              <tr className="sticky top-7 z-20 border-b bg-card text-[11px] tabular-nums text-muted-foreground">
+                <th className="sticky left-0 z-30 border-r bg-card px-3 py-1 text-left text-[10px] font-medium uppercase">
                   Hourly Observation
                 </th>
                 {matrixData.map((slot) => (
                   <th
                     key={slot.key}
-                    className={`min-w-[72px] px-1 py-1.5 text-center border-r border-slate-800 font-mono ${slot.isLatest ? "bg-[#3b1263] text-white font-bold" : "text-slate-300"
-                      }`}
+                    className={cn(
+                      "min-w-[72px] border-r px-1 py-1.5 text-center font-medium",
+                      slot.isLatest && "bg-primary/10 font-semibold text-primary"
+                    )}
                   >
                     <div className="flex flex-col items-center">
                       <span>{slot.timeStr}</span>
                       {slot.isLatest && (
-                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] bg-purple-500 font-bold text-white uppercase tracking-wider animate-pulse">
+                        <span className="mt-0.5 inline-block animate-pulse rounded bg-primary px-1.5 text-[9px] font-semibold uppercase tracking-wider text-primary-foreground">
                           New
                         </span>
                       )}
@@ -530,7 +481,7 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             </thead>
 
             {/* MONITOR SECTION ROWS */}
-            <tbody className="divide-y divide-slate-800/80 font-mono text-[11px]">
+            <tbody className="divide-y text-[11px] tabular-nums">
               {/* CVP */}
               <FlowsheetRow label="CVP" data={matrixData} field="cvp" isLatestPulse={liveHighlight} />
 
@@ -538,12 +489,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               <FlowsheetRow label="Pulse" data={matrixData} field="pulse" highlightBold isLatestPulse={liveHighlight} />
 
               {/* Heart Rhythm */}
-              <tr className="hover:bg-slate-800/40">
-                <td className="sticky left-0 z-10 bg-[#181c23] px-3 py-1 border-r border-slate-800 font-sans font-semibold text-slate-300">
-                  Heart Rhythm
-                </td>
+              <tr className={ROW}>
+                <td className={LABEL_CELL}>Heart Rhythm</td>
                 {matrixData.map((slot) => (
-                  <td key={slot.key} className="px-1 py-1 text-center border-r border-slate-800/70">
+                  <td key={slot.key} className="border-r px-1 py-1 text-center">
                     <select
                       aria-label="Heart Rhythm"
                       value={slot.heartRhythm}
@@ -553,10 +502,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                           [slot.key]: e.target.value,
                         }))
                       }
-                      className="w-14 bg-transparent text-[10px] text-slate-300 text-center focus:bg-slate-900 border-none outline-none cursor-pointer"
+                      className="w-14 cursor-pointer rounded border-none bg-transparent text-center text-[10px] outline-none focus:bg-background"
                     >
                       {HEART_RHYTHMS.map((r) => (
-                        <option key={r} value={r} className="bg-slate-900 text-white">
+                        <option key={r} value={r} className="bg-popover text-popover-foreground">
                           {r}
                         </option>
                       ))}
@@ -584,19 +533,19 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               <FlowsheetRow label="Diastolic (NI)" data={matrixData} field="diaNi" muted isLatestPulse={liveHighlight} />
 
               {/* Temperature (CRITICAL: Red alert boxes for values >= 38) */}
-              <tr className="hover:bg-slate-800/40">
-                <td className="sticky left-0 z-10 bg-[#181c23] px-3 py-1 border-r border-slate-800 font-sans font-semibold text-slate-300">
-                  Temperature
-                </td>
+              <tr className={ROW}>
+                <td className={LABEL_CELL}>Temperature</td>
                 {matrixData.map((slot) => {
                   const isHigh = slot.temperature >= 38;
                   return (
-                    <td key={slot.key} className="px-1 py-1 text-center border-r border-slate-800/70">
+                    <td key={slot.key} className="border-r px-1 py-1 text-center">
                       <div
-                        className={`inline-block px-1.5 py-0.5 rounded ${isHigh
-                          ? "border border-red-600/80 bg-red-950/40 text-red-500 font-bold"
-                          : "text-slate-400"
-                          }`}
+                        className={cn(
+                          "inline-block rounded px-1.5 py-0.5",
+                          isHigh
+                            ? "border border-status-critical/50 bg-status-critical/10 font-semibold text-status-critical"
+                            : "text-muted-foreground"
+                        )}
                       >
                         {slot.temperature}
                       </div>
@@ -627,20 +576,20 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               <FlowsheetRow label="GCS" data={matrixData} field="gcs" isLatestPulse={liveHighlight} />
 
               {/* Approve / Edit Row */}
-              <tr className="bg-[#161a22] hover:bg-slate-800/40">
-                <td className="sticky left-0 z-10 bg-[#161a22] px-3 py-1.5 border-r border-slate-800 font-sans font-semibold text-slate-300">
-                  Approve / Edit
-                </td>
+              <tr className="bg-muted/30">
+                <td className={cn(LABEL_CELL, "bg-muted py-1.5")}>Approve / Edit</td>
                 {matrixData.map((slot) => (
-                  <td key={slot.key} className="px-1 py-1.5 text-center border-r border-slate-800/70">
+                  <td key={slot.key} className="border-r px-1 py-1.5 text-center">
                     <button
                       type="button"
                       onClick={() => handleApprove(slot.key)}
                       title={`Approve ${slot.timeStr}`}
-                      className={`inline-flex items-center justify-center size-5 rounded transition-all cursor-pointer ${slot.isApproved
-                        ? "bg-emerald-500 text-white shadow-sm"
-                        : "bg-emerald-600/70 hover:bg-emerald-500 text-white"
-                        }`}
+                      className={cn(
+                        "inline-flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
+                        slot.isApproved
+                          ? "bg-status-good text-white shadow-xs"
+                          : "border border-status-good/40 text-status-good hover:bg-status-good/10"
+                      )}
                     >
                       <Check className="size-3.5 stroke-[3]" />
                     </button>
@@ -649,30 +598,30 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               </tr>
 
               {/* Validation Date */}
-              <tr className="hover:bg-slate-800/40">
-                <td className="sticky left-0 z-10 bg-[#181c23] px-3 py-1 border-r border-slate-800 font-sans font-semibold text-slate-400">
-                  Validation Date
-                </td>
+              <tr className={ROW}>
+                <td className={cn(LABEL_CELL, "text-muted-foreground")}>Validation Date</td>
                 {matrixData.map((slot) => (
-                  <td key={slot.key} className="px-1 py-1 text-center border-r border-slate-800/70 text-[10px] text-slate-500">
+                  <td key={slot.key} className="border-r px-1 py-1 text-center text-[10px] text-muted-foreground">
                     {slot.validationDate}
                   </td>
                 ))}
               </tr>
             </tbody>
 
-            {/* 5. VENTILATOR SECTION HEADER AND ROWS */}
+            {/* 4. VENTILATOR SECTION HEADER AND ROWS */}
             <thead>
-              <tr className="bg-[#240b3b] text-purple-200 font-semibold border-t-2 border-b border-purple-900 sticky top-14 z-20">
-                <th className="sticky left-0 z-30 bg-[#240b3b] px-3 py-1.5 text-left border-r border-purple-950 w-44 font-bold text-white flex items-center gap-1.5">
-                  <Wind className="size-3.5 text-purple-300" />
+              <tr className="sticky top-14 z-20 border-t-2 border-b bg-muted font-medium text-muted-foreground">
+                <th className="sticky left-0 z-30 flex w-44 items-center gap-1.5 border-r bg-muted px-3 py-1.5 text-left font-semibold text-foreground">
+                  <Wind className="size-3.5 text-primary" />
                   VENTILATOR TYPES
                 </th>
                 {matrixData.map((slot) => (
                   <th
                     key={`vent_${slot.key}`}
-                    className={`min-w-[72px] px-1 py-1 text-center border-r border-purple-950/70 font-mono text-[10px] ${slot.isLatest ? "bg-[#45166f] text-white font-bold" : "text-purple-300/80"
-                      }`}
+                    className={cn(
+                      "min-w-[72px] border-r px-1 py-1 text-center text-[10px] font-medium tabular-nums",
+                      slot.isLatest && "bg-primary/10 font-semibold text-primary"
+                    )}
                   >
                     {slot.timeStr}
                   </th>
@@ -680,7 +629,7 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/80 font-mono text-[11px]">
+            <tbody className="divide-y text-[11px] tabular-nums">
               {/* OXYGEN */}
               <FlowsheetRow label="OXYGEN" data={matrixData} field="oxygen" isLatestPulse={liveHighlight} />
 
@@ -703,30 +652,31 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
         </div>
       </div>
 
-      {/* 6. CLINICAL FOOTER */}
-      <div className="bg-[#181a20] border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-[11px] text-slate-400">
+      {/* 5. CLINICAL FOOTER */}
+      <div className="flex flex-wrap items-center justify-between border-t bg-muted/30 px-4 py-2 text-[11px] text-muted-foreground">
         <div>
           <span>© 2026 VEXOS Health · All Rights Reserved</span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="font-medium text-slate-300">Saint Joseph Medical Center</span>
-          <span className="text-purple-400 font-bold bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800/60">
-            ICU Central Pod
-          </span>
-          <span className="font-mono text-slate-500">version 6.7.48</span>
+          <span className="font-medium text-foreground">Saint Joseph Medical Center</span>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">ICU Central Pod</span>
+          <span className="tabular-nums">version 6.7.48</span>
         </div>
       </div>
     </div>
   );
 }
 
+const ICON_BUTTON = "rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+const ROW = "group transition-colors hover:bg-muted/50";
+// Sticky label column needs an opaque background so scrolled cells stay hidden behind it.
+const LABEL_CELL = "sticky left-0 z-10 border-r bg-card px-3 py-1 font-medium group-hover:bg-muted";
+
 // Reusable table row for clinical matrix
 function FlowsheetRow({ label, data, field, highlightBold = false, muted = false, isLatestPulse = false }) {
   return (
-    <tr className="hover:bg-slate-800/40 transition-colors">
-      <td className="sticky left-0 z-10 bg-[#181c23] px-3 py-1 border-r border-slate-800 font-sans font-semibold text-slate-300">
-        {label}
-      </td>
+    <tr className={ROW}>
+      <td className={LABEL_CELL}>{label}</td>
       {data.map((slot) => {
         const val = slot[field];
         const isLatest = slot.isLatest;
@@ -734,8 +684,11 @@ function FlowsheetRow({ label, data, field, highlightBold = false, muted = false
         return (
           <td
             key={slot.key}
-            className={`px-1 py-1 text-center border-r border-slate-800/70 transition-all ${isLatest && isLatestPulse ? "bg-purple-900/40 text-purple-200" : ""
-              } ${highlightBold ? "font-bold text-slate-200" : muted ? "text-slate-500" : "text-slate-300"}`}
+            className={cn(
+              "border-r px-1 py-1 text-center transition-all",
+              highlightBold ? "font-semibold text-foreground" : muted ? "text-muted-foreground" : "text-foreground/80",
+              isLatest && isLatestPulse && "bg-primary/10 text-primary"
+            )}
           >
             {val !== "" && val !== undefined && val !== null ? val : "—"}
           </td>
