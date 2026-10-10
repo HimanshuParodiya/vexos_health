@@ -14,7 +14,10 @@ export function AuthLayout({ eyebrow, title, subtitle, children }) {
   return (
     <div className="grid min-h-svh lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <aside className="auth-panel relative hidden overflow-hidden text-white lg:sticky lg:top-0 lg:flex lg:h-svh lg:flex-col lg:justify-between lg:p-10 xl:p-14">
-        <div className="auth-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div
+          className="auth-grid pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        />
 
         <BrandMark inverted className="relative" />
 
@@ -25,14 +28,17 @@ export function AuthLayout({ eyebrow, title, subtitle, children }) {
               Clinical care moves fast. Your access should too.
             </h2>
             <p className="max-w-md text-white/70">
-              Doctors, nurses and administrators sign in once and land exactly where
-              their work begins.
+              Doctors, nurses and administrators sign in once and land exactly
+              where their work begins.
             </p>
           </div>
 
           <ul className="space-y-3">
             {HIGHLIGHTS.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-sm text-white/85">
+              <li
+                key={text}
+                className="flex items-center gap-3 text-sm text-white/85"
+              >
                 <span className="flex size-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
                   <Icon className="size-4" />
                 </span>
@@ -64,8 +70,12 @@ export function AuthLayout({ eyebrow, title, subtitle, children }) {
                 {eyebrow}
               </p>
             )}
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-            {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
+            )}
           </header>
           {children}
         </div>

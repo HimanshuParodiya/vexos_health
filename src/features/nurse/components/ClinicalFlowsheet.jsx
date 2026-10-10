@@ -19,14 +19,20 @@ import { toast } from "sonner";
 import { useVitalsWebSocket } from "../hooks/useVitalsWebSocket";
 import { vexosApi } from "@/services/vexos-api";
 import { cn } from "@/lib/utils";
+import { DEFAULT_ORGANIZATION } from "@/config/organization";
+import { useAuth } from "@/features/auth";
 
-// 24-hour column generation helper based on target date
-function generateTimelineSlots(baseDate = new Date()) {
+const HOUR_MS = 3600 * 1000;
+
+// 24 hourly columns ending at the hour that contains `endTime`.
+function generateTimelineSlots(endTime) {
   const slots = [];
-  const start = new Date(baseDate.getTime() - 23 * 3600 * 1000);
+  const end = new Date(endTime);
+  end.setMinutes(0, 0, 0);
+  const start = new Date(end.getTime() - 23 * HOUR_MS);
 
   for (let i = 0; i < 24; i++) {
-    const d = new Date(start.getTime() + i * 3600 * 1000);
+    const d = new Date(start.getTime() + i * HOUR_MS);
     const dateStr = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, "0")}:00`;
     slots.push({
@@ -40,11 +46,49 @@ function generateTimelineSlots(baseDate = new Date()) {
   return slots;
 }
 
-const HEART_RHYTHMS = ["NSR", "Sinus Tach", "Sinus Brady", "AFib", "A-Flutter", "Paced"];
+const HEART_RHYTHMS = [
+  "NSR",
+  "Sinus Tach",
+  "Sinus Brady",
+  "AFib",
+  "A-Flutter",
+  "Paced",
+];
+
+// First non-null value among the given keys; backends name some parameters differently.
+function pick(obs, ...keys) {
+  if (!obs) return null;
+  for (const key of keys) {
+    if (obs[key] != null && obs[key] !== "") return Number(obs[key]);
+  }
+  return null;
+}
+
+function round(value, digits = 0) {
+  if (value == null || Number.isNaN(value)) return null;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function meanPressure(sys, dia) {
+  return sys != null && dia != null ? (sys + 2 * dia) / 3 : null;
+}
+
+function observationTime(obs) {
+  const raw = obs?.timestamp ?? obs?.observed_at ?? obs?.time;
+  const time = raw ? new Date(raw).getTime() : NaN;
+  return Number.isNaN(time) ? null : time;
+}
 
 export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
-  const [selectedBedId, setSelectedBedId] = useState(currentBed?.bed_id || beds[0]?.bed_id || "BED-01");
-  const [filterDate, setFilterDate] = useState("09/24/2026 12:00 PM");
+  const { user } = useAuth();
+  const [selectedBedId, setSelectedBedId] = useState(
+    currentBed?.bed_id || beds[0]?.bed_id || "",
+  );
+  const [now, setNow] = useState(() => Date.now());
+  const [filterDate, setFilterDate] = useState(() =>
+    new Date().toLocaleString(),
+  );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [approvedSlots, setApprovedSlots] = useState({});
   const [rhythms, setRhythms] = useState({});
@@ -55,22 +99,26 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
   const scrollWrapperRef = useRef(null);
 
   // Active bed data
-  const bed = beds.find((b) => b.bed_id === selectedBedId) || beds[0] || {
-    bed_id: "BED-01",
-    patient: { mrn: "ZeroOne", name: "Jessica Marie Farley", gender: "Female" },
-    admitted_at: "2026-09-24T13:50:29.86Z",
-    length_of_stay: "966",
-  };
+  const bed = beds.find((b) => b.bed_id === selectedBedId) || beds[0] || null;
 
-  const patientMrn = bed.patient?.mrn || "ZeroOne";
+  const patientMrn = bed?.patient?.mrn || null;
   const [historicalVitals, setHistoricalVitals] = useState([]);
   const [ventilatorData, setVentilatorData] = useState(null);
   const [loadingPatientData, setLoadingPatientData] = useState(false);
+
+  // Move the 24-hour window forward as the clock passes each hour.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Fetch telemetry whenever active bed changes
   useEffect(() => {
     let cancelled = false;
     async function fetchBedData() {
+      // Never show the previous patient's readings under the new bed.
+      setHistoricalVitals([]);
+      setVentilatorData(null);
       if (!patientMrn) return;
       setLoadingPatientData(true);
       try {
@@ -79,8 +127,13 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
           vexosApi.getPatientVentilator(patientMrn),
         ]);
         if (!cancelled) {
-          if (vitalsRes.status === "fulfilled" && Array.isArray(vitalsRes.value)) {
+          if (
+            vitalsRes.status === "fulfilled" &&
+            Array.isArray(vitalsRes.value)
+          ) {
             setHistoricalVitals(vitalsRes.value);
+          } else if (vitalsRes.status === "rejected") {
+            toast.error(`Could not load vitals for ${patientMrn}`);
           }
           if (ventRes.status === "fulfilled" && ventRes.value) {
             setVentilatorData(ventRes.value);
@@ -99,85 +152,88 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
   }, [patientMrn]);
 
   // WebSocket Live Streaming Hook
-  const { isConnected, isConnecting, reconnect, lastMessageAt } = useVitalsWebSocket({
-    onVitalUpdate: (liveVital) => {
-      if (!liveVital) return;
-      if (liveVital.bed_id === selectedBedId || liveVital.mrn === patientMrn) {
-        setHistoricalVitals((prev) => [...prev, liveVital]);
-        setLiveHighlight(true);
-        setTimeout(() => setLiveHighlight(false), 2000);
-      }
-    },
-  });
+  const { isConnected, isConnecting, reconnect, lastMessageAt } =
+    useVitalsWebSocket({
+      onVitalUpdate: (liveVital) => {
+        if (!liveVital) return;
+        if (
+          (selectedBedId && liveVital.bed_id === selectedBedId) ||
+          (patientMrn && liveVital.mrn === patientMrn)
+        ) {
+          setHistoricalVitals((prev) => [...prev, liveVital]);
+          setLiveHighlight(true);
+          setTimeout(() => setLiveHighlight(false), 2000);
+        }
+      },
+    });
 
-  const timeSlots = useMemo(() => generateTimelineSlots(new Date(2026, 8, 24, 12, 0)), []);
+  const timeSlots = useMemo(() => generateTimelineSlots(now), [now]);
 
-  // Compute values for each time slot from telemetry or seed baselines
+  // Each hourly column shows the latest real observation recorded in that hour; empty hours stay blank.
   const matrixData = useMemo(() => {
-    // Fixed seed values matching clinical reference screenshot
-    const cvpSeed = [5, 6, 5, 5, 7, 9, 8, 8, 9, 9, 7, 7, 5, 7, 5, 6, 7, 8, 7, 9, 8, 7, 7, 9];
-    const pulseSeed = [86, 111, 63, 112, 73, 109, 62, 114, 82, 106, 98, 93, 83, 111, 118, 77, 101, 107, 101, 64, 112, 102, 63, 102];
-    const meanArterySeed = [99, 84, 99, 104, 103, 98, 90, 101, 104, 104, 93, 106, 93, 97, 87, 99, 102, 93, 87, 99, 84, 94, 102, 90];
-    const sysArterySeed = [144, 130, 136, 135, 144, 144, 135, 142, 149, 141, 148, 145, 147, 130, 130, 130, 138, 148, 138, 131, 132, 145, 145, 147];
-    const diaArterySeed = [77, 61, 81, 89, 82, 75, 67, 80, 82, 86, 65, 86, 66, 80, 66, 83, 84, 66, 61, 83, 60, 68, 80, 61];
-    const tempSeed = [38, 38, 38, 38, 37, 36, 38, 39, 39, 38, 38, 38, 37, 38, 37, 38, 38, 39, 36, 36, 37, 38, 38, 38];
-    const respSeed = [25, 21, 24, 22, 22, 21, 25, 25, 20, 21, 21, 22, 20, 25, 22, 22, 25, 21, 21, 21, 21, 22, 25, 24];
-    const spo2Seed = [96, 97, 98, 96, 99, 95, 98, 95, 98, 97, 99, 98, 98, 95, 97, 97, 98, 97, 95, 97, 95, 97, 95, 98];
+    const vitalsBySlot = new Map();
+    for (const obs of historicalVitals) {
+      const time = observationTime(obs);
+      if (time == null) continue;
+      const slot = timeSlots.find(
+        (s) => time >= s.timestamp && time < s.timestamp + HOUR_MS,
+      );
+      if (!slot) continue;
+      const current = vitalsBySlot.get(slot.key);
+      if (!current || observationTime(current) <= time)
+        vitalsBySlot.set(slot.key, obs);
+    }
 
-    // Ventilator seed values
-    const o2Seed = [59.31, 34.29, 76.64, 50.09, 70.65, 79.12, 92.87, 79.5, 98.06, 73.79, 79.95, 76.18, 63.99, 22.53, 71.8, 76.75, 54.03, 78.26, 33.61, 42.68, 30.42, 45.2, 52.1, 60.5];
-    const fio2Seed = [34, 33, 91, 93, 54, 76, 97, 58, 74, 75, 63, 61, 97, 57, 88, 37, 82, 73, 55, 98, 22, 40, 50, 45];
-    const vteSeed = [489, 483, 396, 446, 355, 467, 493, 395, 380, 497, 358, 412, 418, 453, 416, 372, 378, 389, 456, 486, 444, 460, 455, 462];
-    const vtiSeed = [452, 457, 437, 446, 383, 409, 423, 469, 484, 368, 443, 435, 447, 351, 469, 367, 369, 443, 367, 490, 380, 448, 452, 450];
+    // The ventilator endpoint returns only the most recent reading.
+    const ventTime = observationTime(ventilatorData);
+    const ventSlotKey = ventilatorData
+      ? ventTime == null
+        ? timeSlots.at(-1).key
+        : timeSlots.find(
+            (s) => ventTime >= s.timestamp && ventTime < s.timestamp + HOUR_MS,
+          )?.key
+      : null;
 
-    // Merge latest historical observation into latest slot if present
-    const latestObs = historicalVitals.at(-1);
+    return timeSlots.map((slot) => {
+      const obs = vitalsBySlot.get(slot.key);
+      const vent = slot.key === ventSlotKey ? ventilatorData : null;
 
-    return timeSlots.map((slot, index) => {
-      const isLatest = slot.isLatest;
-
-      const cvp = isLatest && latestObs?.cvp != null ? Math.round(latestObs.cvp) : cvpSeed[index % cvpSeed.length];
-      const pulse = isLatest && latestObs?.heart_rate != null ? Math.round(latestObs.heart_rate) : pulseSeed[index % pulseSeed.length];
-      const meanArtery = isLatest && latestObs?.arterial_systolic_bp != null ? Math.round((2 * (latestObs.arterial_diastolic_bp || 80) + latestObs.arterial_systolic_bp) / 3) : meanArterySeed[index % meanArterySeed.length];
-      const sysArtery = isLatest && latestObs?.arterial_systolic_bp != null ? Math.round(latestObs.arterial_systolic_bp) : sysArterySeed[index % sysArterySeed.length];
-      const diaArtery = isLatest && latestObs?.arterial_diastolic_bp != null ? Math.round(latestObs.arterial_diastolic_bp) : diaArterySeed[index % diaArterySeed.length];
-      const temp = isLatest && latestObs?.temperature != null ? Math.round(latestObs.temperature) : tempSeed[index % tempSeed.length];
-      const resp = isLatest && latestObs?.respiratory_rate != null ? Math.round(latestObs.respiratory_rate) : respSeed[index % respSeed.length];
-      const spo2 = isLatest && latestObs?.spo2 != null ? Math.round(latestObs.spo2) : spo2Seed[index % spo2Seed.length];
-
-      const oxygen = isLatest && ventilatorData?.oxygen != null ? Number(ventilatorData.oxygen).toFixed(2) : o2Seed[index % o2Seed.length];
-      const fio2 = isLatest && ventilatorData?.fio2 != null ? Math.round(ventilatorData.fio2) : fio2Seed[index % fio2Seed.length];
-      const vte = isLatest && ventilatorData?.vte != null ? Math.round(ventilatorData.vte) : vteSeed[index % vteSeed.length];
-      const vti = isLatest && ventilatorData?.vti != null ? Math.round(ventilatorData.vti) : vtiSeed[index % vtiSeed.length];
+      const sysArtery = pick(obs, "arterial_systolic_bp", "systolic_bp");
+      const diaArtery = pick(obs, "arterial_diastolic_bp", "diastolic_bp");
+      const sysNi = pick(obs, "nbp_systolic_bp");
+      const diaNi = pick(obs, "nbp_diastolic_bp");
 
       return {
         ...slot,
-        cvp,
-        pulse,
-        heartRhythm: rhythms[slot.key] || "NSR",
-        meanArtery,
-        sysArtery,
-        diaArtery,
-        meanNi: Math.round(meanArtery * 0.96),
-        sysNi: Math.round(sysArtery * 0.98),
-        diaNi: Math.round(diaArtery * 0.95),
-        temperature: temp,
-        resp,
-        pa: "",
-        endTidal: "",
-        perf: "",
-        leftAtriumPressure: "",
-        spo2,
-        gcs: 15,
+        cvp: round(pick(obs, "cvp")),
+        pulse: round(pick(obs, "heart_rate", "pulse_rate")),
+        heartRhythm: rhythms[slot.key] || "",
+        meanArtery: round(
+          pick(obs, "arterial_mean_bp", "mean_arterial_pressure") ??
+            meanPressure(sysArtery, diaArtery),
+        ),
+        sysArtery: round(sysArtery),
+        diaArtery: round(diaArtery),
+        meanNi: round(pick(obs, "nbp_mean_bp") ?? meanPressure(sysNi, diaNi)),
+        sysNi: round(sysNi),
+        diaNi: round(diaNi),
+        temperature: round(pick(obs, "temperature"), 1),
+        resp: round(pick(obs, "respiratory_rate")),
+        pa: round(pick(obs, "pa_mean_bp", "pulmonary_artery_pressure")),
+        endTidal: round(pick(obs, "etco2", "end_tidal_co2")),
+        perf: round(pick(obs, "perfusion_index", "perf"), 1),
+        leftAtriumPressure: round(pick(obs, "lap", "left_atrium_pressure")),
+        spo2: round(pick(obs, "spo2")),
+        gcs: round(pick(obs, "gcs")),
         isApproved: approvedSlots[slot.key] || false,
         validationDate: approvedSlots[slot.key] ? slot.timeStr : "",
         // Ventilator
-        oxygen,
-        fio2,
-        tidalVolume: 450,
-        vte,
-        vti,
-        vtiSetting: 450,
+        oxygen: round(pick(vent, "oxygen"), 2),
+        fio2: round(pick(vent, "fio2")),
+        tidalVolume: round(pick(vent, "tidal_volume", "tidalvolume")),
+        vte: round(pick(vent, "vte")),
+        vti: round(pick(vent, "vti")),
+        vtiSetting: round(pick(vent, "vti_setting")),
       };
     });
   }, [timeSlots, historicalVitals, ventilatorData, rhythms, approvedSlots]);
@@ -185,7 +241,11 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
   const handleApprove = (slotKey) => {
     setApprovedSlots((prev) => {
       const next = !prev[slotKey];
-      toast.success(next ? `Observation at ${slotKey.split("_")[1]} Approved` : "Approval Removed");
+      toast.success(
+        next
+          ? `Observation at ${slotKey.split("_")[1]} Approved`
+          : "Approval Removed",
+      );
       return { ...prev, [slotKey]: next };
     });
   };
@@ -201,7 +261,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
 
   const handleExportCsv = () => {
     try {
-      const headers = ["Metric", ...matrixData.map((d) => `${d.dateStr} ${d.timeStr}`)];
+      const headers = [
+        "Metric",
+        ...matrixData.map((d) => `${d.dateStr} ${d.timeStr}`),
+      ];
       const rows = [
         ["CVP", ...matrixData.map((d) => d.cvp)],
         ["Pulse", ...matrixData.map((d) => d.pulse)],
@@ -228,7 +291,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `VEXOS_Flowsheet_${selectedBedId}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute(
+        "download",
+        `VEXOS_Flowsheet_${selectedBedId}_${new Date().toISOString().slice(0, 10)}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -257,20 +323,26 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
       ref={containerRef}
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-all",
-        isFullscreen ? "fixed inset-0 z-50 h-screen rounded-none" : "h-[calc(100vh-187px)]"
+        isFullscreen
+          ? "fixed inset-0 z-50 h-screen rounded-none"
+          : "h-[calc(100vh-187px)]",
       )}
     >
       {/* 1. CLINICAL CONTEXT & PATIENT BANNER */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <h1 className="font-heading text-base font-semibold tracking-tight">Data Validation & Entry</h1>
+          <h1 className="font-heading text-base font-semibold tracking-tight">
+            Data Validation & Entry
+          </h1>
 
           {/* Quick Clinical Tool Icons */}
           <div className="hidden items-center gap-1 rounded-lg border bg-muted/50 p-1 sm:flex">
             <button type="button" title="PACS" className={ICON_BUTTON}>
               <Video className="size-4" />
             </button>
-            <span className="px-1 text-[10px] font-semibold text-muted-foreground">PACS</span>
+            <span className="px-1 text-[10px] font-semibold text-muted-foreground">
+              PACS
+            </span>
             <button type="button" title="ECG Waveform" className={ICON_BUTTON}>
               <Activity className="size-4" />
             </button>
@@ -280,7 +352,11 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             <button type="button" title="Medications" className={ICON_BUTTON}>
               <Pill className="size-4" />
             </button>
-            <button type="button" title="Infusion/Syringe" className={ICON_BUTTON}>
+            <button
+              type="button"
+              title="Infusion/Syringe"
+              className={ICON_BUTTON}
+            >
               <Syringe className="size-4" />
             </button>
           </div>
@@ -311,18 +387,44 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               )}
             </div>
 
-            <div className="truncate font-semibold text-foreground">
-              {bed.patient?.name || "Jessica Marie Farley"}, {bed.age || 55}y
-            </div>
-            <span>MRN: <strong className="font-medium text-foreground">{bed.patient?.mrn || "123"}</strong></span>
-            <span>FIN: -</span>
-            <span>{bed.patient?.gender === "U" ? "Female" : bed.patient?.gender || "Female"}</span>
-            <span>Bed: <strong className="font-medium text-foreground">{bed.bed_id}</strong></span>
-            <span>LOS: <strong className="font-medium text-foreground">{bed.length_of_stay || "966"}</strong></span>
-            <span className="hidden truncate xl:inline">Relative: 83993739404</span>
+            {bed ? (
+              <>
+                <div className="truncate font-semibold text-foreground">
+                  {bed.patient?.name || "Unknown patient"}
+                  {bed.age != null && `, ${bed.age}y`}
+                </div>
+                <span>
+                  MRN:{" "}
+                  <strong className="font-medium text-foreground">
+                    {bed.patient?.mrn || "—"}
+                  </strong>
+                </span>
+                {bed.patient?.gender && bed.patient.gender !== "U" && (
+                  <span>{bed.patient.gender}</span>
+                )}
+                <span>
+                  Bed:{" "}
+                  <strong className="font-medium text-foreground">
+                    {bed.bed_id}
+                  </strong>
+                </span>
+                <span>
+                  LOS:{" "}
+                  <strong className="font-medium text-foreground">
+                    {bed.length_of_stay || "—"}
+                  </strong>
+                </span>
+              </>
+            ) : (
+              <span>No beds available</span>
+            )}
           </div>
 
-          <button type="button" title="Edit Clinical Notes" className="p-1 hover:text-foreground">
+          <button
+            type="button"
+            title="Edit Clinical Notes"
+            className="p-1 hover:text-foreground"
+          >
             <Edit2 className="size-3.5" />
           </button>
         </div>
@@ -332,12 +434,16 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
           <button
             type="button"
             title="Toggle Ventilator Section"
-            onClick={() => setActiveTab((prev) => (prev === "VENTILATOR" ? "MONITOR" : "VENTILATOR"))}
+            onClick={() =>
+              setActiveTab((prev) =>
+                prev === "VENTILATOR" ? "MONITOR" : "VENTILATOR",
+              )
+            }
             className={cn(
               "rounded-md border p-1.5 transition-colors",
               activeTab === "VENTILATOR"
                 ? "border-primary bg-primary text-primary-foreground"
-                : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
             )}
           >
             <Wind className="size-4" />
@@ -348,7 +454,11 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             onClick={() => setIsFullscreen(!isFullscreen)}
             className="rounded-md border bg-background p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            {isFullscreen ? (
+              <Minimize2 className="size-4" />
+            ) : (
+              <Maximize2 className="size-4" />
+            )}
           </button>
         </div>
       </div>
@@ -356,7 +466,9 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
       {/* 2. TOOLBAR: DATE FILTER, LIVE INDICATOR, BACK TO NOW, EXPORT CSV */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-2.5 text-xs">
         <div className="flex items-center gap-3">
-          <span className="font-medium text-muted-foreground">Filter by Date:</span>
+          <span className="font-medium text-muted-foreground">
+            Filter by Date:
+          </span>
           <div className="flex items-center gap-1.5">
             <input
               type="text"
@@ -381,27 +493,43 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
         <div className="flex items-center gap-3">
           {/* Live Telemetry Beacon */}
           <div
-            title={lastMessageAt ? `Last packet: ${new Date(lastMessageAt).toLocaleTimeString()}` : "Listening for telemetry..."}
+            title={
+              lastMessageAt
+                ? `Last packet: ${new Date(lastMessageAt).toLocaleTimeString()}`
+                : "Listening for telemetry..."
+            }
             className={cn(
               "flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium",
               isConnected
                 ? "bg-status-good/10 text-status-good"
                 : isConnecting
                   ? "bg-status-warning/15 text-amber-700 dark:text-status-warning"
-                  : "bg-status-critical/10 text-status-critical"
+                  : "bg-status-critical/10 text-status-critical",
             )}
           >
             <span
               className={cn(
                 "size-2 rounded-full",
-                isConnected ? "animate-ping bg-status-good" : isConnecting ? "bg-status-warning" : "bg-status-critical"
+                isConnected
+                  ? "animate-ping bg-status-good"
+                  : isConnecting
+                    ? "bg-status-warning"
+                    : "bg-status-critical",
               )}
             />
             <span className="tracking-tight">
-              {isConnected ? "LIVE TELEMETRY STREAM" : isConnecting ? "Connecting Live Stream…" : "Offline / Click Reconnect"}
+              {isConnected
+                ? "LIVE TELEMETRY STREAM"
+                : isConnecting
+                  ? "Connecting Live Stream…"
+                  : "Offline / Click Reconnect"}
             </span>
             {!isConnected && (
-              <button type="button" onClick={reconnect} className="ml-1 cursor-pointer font-semibold hover:underline">
+              <button
+                type="button"
+                onClick={reconnect}
+                className="ml-1 cursor-pointer font-semibold hover:underline"
+              >
                 Reconnect
               </button>
             )}
@@ -416,7 +544,11 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             Export as CSV
           </button>
 
-          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" title="Table Settings">
+          <button
+            type="button"
+            className="p-1 text-muted-foreground hover:text-foreground"
+            title="Table Settings"
+          >
             <Settings className="size-4" />
           </button>
         </div>
@@ -435,7 +567,10 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
         </div>
 
         {/* Scrollable Matrix Table Container */}
-        <div ref={scrollWrapperRef} className="no-scrollbar relative w-0 min-w-0 max-w-full min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+        <div
+          ref={scrollWrapperRef}
+          className="no-scrollbar relative w-0 min-w-0 max-w-full min-h-0 flex-1 overflow-x-auto overflow-y-auto"
+        >
           <table className="w-full min-w-max select-none border-collapse text-xs">
             {/* Header Dates Row */}
             <thead>
@@ -464,7 +599,8 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                     key={slot.key}
                     className={cn(
                       "min-w-[72px] border-r px-1 py-1.5 text-center font-medium",
-                      slot.isLatest && "bg-primary/10 font-semibold text-primary"
+                      slot.isLatest &&
+                        "bg-primary/10 font-semibold text-primary",
                     )}
                   >
                     <div className="flex flex-col items-center">
@@ -483,10 +619,21 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
             {/* MONITOR SECTION ROWS */}
             <tbody className="divide-y text-[11px] tabular-nums">
               {/* CVP */}
-              <FlowsheetRow label="CVP" data={matrixData} field="cvp" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="CVP"
+                data={matrixData}
+                field="cvp"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Pulse */}
-              <FlowsheetRow label="Pulse" data={matrixData} field="pulse" highlightBold isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Pulse"
+                data={matrixData}
+                field="pulse"
+                highlightBold
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Heart Rhythm */}
               <tr className={ROW}>
@@ -504,8 +651,18 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                       }
                       className="w-14 cursor-pointer rounded border-none bg-transparent text-center text-[10px] outline-none focus:bg-background"
                     >
+                      <option
+                        value=""
+                        className="bg-popover text-popover-foreground"
+                      >
+                        —
+                      </option>
                       {HEART_RHYTHMS.map((r) => (
-                        <option key={r} value={r} className="bg-popover text-popover-foreground">
+                        <option
+                          key={r}
+                          value={r}
+                          className="bg-popover text-popover-foreground"
+                        >
                           {r}
                         </option>
                       ))}
@@ -515,39 +672,76 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               </tr>
 
               {/* Mean AP (Artery) */}
-              <FlowsheetRow label="Mean AP (Artery)" data={matrixData} field="meanArtery" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Mean AP (Artery)"
+                data={matrixData}
+                field="meanArtery"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Systolic (Artery) */}
-              <FlowsheetRow label="Systolic (Artery)" data={matrixData} field="sysArtery" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Systolic (Artery)"
+                data={matrixData}
+                field="sysArtery"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Diastolic (Artery) */}
-              <FlowsheetRow label="Diastolic (Artery)" data={matrixData} field="diaArtery" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Diastolic (Artery)"
+                data={matrixData}
+                field="diaArtery"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Mean AP (NI) */}
-              <FlowsheetRow label="Mean AP (NI)" data={matrixData} field="meanNi" muted isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Mean AP (NI)"
+                data={matrixData}
+                field="meanNi"
+                muted
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Systolic (NI) */}
-              <FlowsheetRow label="Systolic (NI)" data={matrixData} field="sysNi" muted isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Systolic (NI)"
+                data={matrixData}
+                field="sysNi"
+                muted
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Diastolic (NI) */}
-              <FlowsheetRow label="Diastolic (NI)" data={matrixData} field="diaNi" muted isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="Diastolic (NI)"
+                data={matrixData}
+                field="diaNi"
+                muted
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Temperature (CRITICAL: Red alert boxes for values >= 38) */}
               <tr className={ROW}>
                 <td className={LABEL_CELL}>Temperature</td>
                 {matrixData.map((slot) => {
-                  const isHigh = slot.temperature >= 38;
+                  const isHigh =
+                    slot.temperature != null && slot.temperature >= 38;
                   return (
-                    <td key={slot.key} className="border-r px-1 py-1 text-center">
+                    <td
+                      key={slot.key}
+                      className="border-r px-1 py-1 text-center"
+                    >
                       <div
                         className={cn(
                           "inline-block rounded px-1.5 py-0.5",
                           isHigh
                             ? "border border-status-critical/50 bg-status-critical/10 font-semibold text-status-critical"
-                            : "text-muted-foreground"
+                            : "text-muted-foreground",
                         )}
                       >
-                        {slot.temperature}
+                        {slot.temperature ?? "—"}
                       </div>
                     </td>
                   );
@@ -555,31 +749,62 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
               </tr>
 
               {/* RESP */}
-              <FlowsheetRow label="RESP" data={matrixData} field="resp" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="RESP"
+                data={matrixData}
+                field="resp"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* PA */}
               <FlowsheetRow label="PA" data={matrixData} field="pa" muted />
 
               {/* End Tidal */}
-              <FlowsheetRow label="End Tidal" data={matrixData} field="endTidal" muted />
+              <FlowsheetRow
+                label="End Tidal"
+                data={matrixData}
+                field="endTidal"
+                muted
+              />
 
               {/* Perf */}
               <FlowsheetRow label="Perf" data={matrixData} field="perf" muted />
 
               {/* Left Atrium Pressure */}
-              <FlowsheetRow label="Left Atrium Pressure" data={matrixData} field="leftAtriumPressure" muted />
+              <FlowsheetRow
+                label="Left Atrium Pressure"
+                data={matrixData}
+                field="leftAtriumPressure"
+                muted
+              />
 
               {/* SPO2 */}
-              <FlowsheetRow label="SPO2" data={matrixData} field="spo2" highlightBold isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="SPO2"
+                data={matrixData}
+                field="spo2"
+                highlightBold
+                isLatestPulse={liveHighlight}
+              />
 
               {/* GCS */}
-              <FlowsheetRow label="GCS" data={matrixData} field="gcs" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="GCS"
+                data={matrixData}
+                field="gcs"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* Approve / Edit Row */}
               <tr className="bg-muted/30">
-                <td className={cn(LABEL_CELL, "bg-muted py-1.5")}>Approve / Edit</td>
+                <td className={cn(LABEL_CELL, "bg-muted py-1.5")}>
+                  Approve / Edit
+                </td>
                 {matrixData.map((slot) => (
-                  <td key={slot.key} className="border-r px-1 py-1.5 text-center">
+                  <td
+                    key={slot.key}
+                    className="border-r px-1 py-1.5 text-center"
+                  >
                     <button
                       type="button"
                       onClick={() => handleApprove(slot.key)}
@@ -588,7 +813,7 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                         "inline-flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
                         slot.isApproved
                           ? "bg-status-good text-white shadow-xs"
-                          : "border border-status-good/40 text-status-good hover:bg-status-good/10"
+                          : "border border-status-good/40 text-status-good hover:bg-status-good/10",
                       )}
                     >
                       <Check className="size-3.5 stroke-[3]" />
@@ -599,9 +824,14 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
 
               {/* Validation Date */}
               <tr className={ROW}>
-                <td className={cn(LABEL_CELL, "text-muted-foreground")}>Validation Date</td>
+                <td className={cn(LABEL_CELL, "text-muted-foreground")}>
+                  Validation Date
+                </td>
                 {matrixData.map((slot) => (
-                  <td key={slot.key} className="border-r px-1 py-1 text-center text-[10px] text-muted-foreground">
+                  <td
+                    key={slot.key}
+                    className="border-r px-1 py-1 text-center text-[10px] text-muted-foreground"
+                  >
                     {slot.validationDate}
                   </td>
                 ))}
@@ -620,7 +850,8 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
                     key={`vent_${slot.key}`}
                     className={cn(
                       "min-w-[72px] border-r px-1 py-1 text-center text-[10px] font-medium tabular-nums",
-                      slot.isLatest && "bg-primary/10 font-semibold text-primary"
+                      slot.isLatest &&
+                        "bg-primary/10 font-semibold text-primary",
                     )}
                   >
                     {slot.timeStr}
@@ -631,22 +862,52 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
 
             <tbody className="divide-y text-[11px] tabular-nums">
               {/* OXYGEN */}
-              <FlowsheetRow label="OXYGEN" data={matrixData} field="oxygen" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="OXYGEN"
+                data={matrixData}
+                field="oxygen"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* FIO2 */}
-              <FlowsheetRow label="FIO2" data={matrixData} field="fio2" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="FIO2"
+                data={matrixData}
+                field="fio2"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* TIDALVOLUME */}
-              <FlowsheetRow label="TIDALVOLUME" data={matrixData} field="tidalVolume" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="TIDALVOLUME"
+                data={matrixData}
+                field="tidalVolume"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* VTE */}
-              <FlowsheetRow label="VTE" data={matrixData} field="vte" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="VTE"
+                data={matrixData}
+                field="vte"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* VTI */}
-              <FlowsheetRow label="VTI" data={matrixData} field="vti" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="VTI"
+                data={matrixData}
+                field="vti"
+                isLatestPulse={liveHighlight}
+              />
 
               {/* VTI SETTING */}
-              <FlowsheetRow label="VTI SETTING" data={matrixData} field="vtiSetting" isLatestPulse={liveHighlight} />
+              <FlowsheetRow
+                label="VTI SETTING"
+                data={matrixData}
+                field="vtiSetting"
+                isLatestPulse={liveHighlight}
+              />
             </tbody>
           </table>
         </div>
@@ -657,23 +918,30 @@ export function ClinicalFlowsheet({ beds = [], currentBed, onSelectBed }) {
         <div>
           <span>© 2026 VEXOS Health · All Rights Reserved</span>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="font-medium text-foreground">Saint Joseph Medical Center</span>
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">ICU Central Pod</span>
-          <span className="tabular-nums">version 6.7.48</span>
-        </div>
+        <span className="font-medium text-foreground">
+          {user?.organization?.name || DEFAULT_ORGANIZATION.name}
+        </span>
       </div>
     </div>
   );
 }
 
-const ICON_BUTTON = "rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+const ICON_BUTTON =
+  "rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
 const ROW = "group transition-colors hover:bg-muted/50";
 // Sticky label column needs an opaque background so scrolled cells stay hidden behind it.
-const LABEL_CELL = "sticky left-0 z-10 border-r bg-card px-3 py-1 font-medium group-hover:bg-muted";
+const LABEL_CELL =
+  "sticky left-0 z-10 border-r bg-card px-3 py-1 font-medium group-hover:bg-muted";
 
 // Reusable table row for clinical matrix
-function FlowsheetRow({ label, data, field, highlightBold = false, muted = false, isLatestPulse = false }) {
+function FlowsheetRow({
+  label,
+  data,
+  field,
+  highlightBold = false,
+  muted = false,
+  isLatestPulse = false,
+}) {
   return (
     <tr className={ROW}>
       <td className={LABEL_CELL}>{label}</td>
@@ -686,8 +954,12 @@ function FlowsheetRow({ label, data, field, highlightBold = false, muted = false
             key={slot.key}
             className={cn(
               "border-r px-1 py-1 text-center transition-all",
-              highlightBold ? "font-semibold text-foreground" : muted ? "text-muted-foreground" : "text-foreground/80",
-              isLatest && isLatestPulse && "bg-primary/10 text-primary"
+              highlightBold
+                ? "font-semibold text-foreground"
+                : muted
+                  ? "text-muted-foreground"
+                  : "text-foreground/80",
+              isLatest && isLatestPulse && "bg-primary/10 text-primary",
             )}
           >
             {val !== "" && val !== undefined && val !== null ? val : "—"}
