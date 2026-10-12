@@ -4,7 +4,7 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 export function LoginPage() {
   return (
     <AuthLayout
-      eyebrow="Care team portal"
+      eyebrow="Welcome"
       title="Sign in to your workspace"
       subtitle="Your role determines which dashboard opens after sign in."
     >
