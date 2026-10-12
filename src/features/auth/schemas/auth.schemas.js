@@ -8,6 +8,11 @@ const usernameOrEmail = z.string().trim().min(1, "Username or email is required"
 export const loginSchema = z.object({
   email: usernameOrEmail,
   password: z.string().min(1, "Password is required"),
+  mfaCode: z
+    .string()
+    .trim()
+    .regex(/^(d{6})?$/, "Enter the 6-digit code from your authenticator app")
+    .optional(),
   rememberDevice: z.boolean().optional(),
 });
 

@@ -32,7 +32,7 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: env.devUsername || "frontend_dev", password: "", rememberDevice: false },
+    defaultValues: { email: env.devUsername || "frontend_dev", password: "", mfaCode: "", rememberDevice: false },
   });
 
   const rememberDevice = useWatch({ control, name: "rememberDevice" });
@@ -40,7 +40,7 @@ export function LoginForm() {
   const onSubmit = async (values) => {
     setFormError(null);
     try {
-      const user = await login({ email: values.email, password: values.password });
+      const user = await login({ email: values.email, password: values.password, mfaCode: values.mfaCode });
       toast.success(`Welcome back, ${user.fullName}`);
 
       // Return to the page the user tried to open, but only if it belongs to their role.
@@ -130,6 +130,21 @@ export function LoginForm() {
             />
           )}
         </FormField>
+
+        {!env.useMockApi && (
+          <FormField id="mfaCode" label="MFA code (if enabled for your account)" error={errors.mfaCode?.message}>
+            {(field) => (
+              <Input
+                {...field}
+                {...register("mfaCode")}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6-digit code"
+                className="h-11 font-mono tracking-widest"
+              />
+            )}
+          </FormField>
+        )}
 
         <div className="flex items-center gap-2">
           <Checkbox

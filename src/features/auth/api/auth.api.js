@@ -1,6 +1,7 @@
 import { httpClient } from "@/services/http-client";
 import { decodeJwt } from "@/services/jwt";
 import { tokenStorage } from "@/services/token-storage";
+import { DEFAULT_ORGANIZATION } from "@/config/organization";
 import { ROLES } from "@/config/roles";
 import { AUTH_ENDPOINTS } from "./auth.endpoints";
 
@@ -24,11 +25,21 @@ function userFromToken(token) {
     email: payload.email || `${username}@vexos.health`,
     role,
     department: role === ROLES.NURSE ? "ICU" : role === ROLES.DOCTOR ? "Critical Care" : "Administration",
-    organization: {
-      name: "Saint Joseph Medical Center",
-      logoUrl: "",
-    },
+    organization: { ...DEFAULT_ORGANIZATION },
   };
+}
+
+// Facility branding from GET /hospital; null when the endpoint is unavailable.
+async function fetchOrganization(accessToken) {
+  try {
+    const hospital = await httpClient.get(AUTH_ENDPOINTS.HOSPITAL, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+    if (hospital?.name) return { name: hospital.name, logoUrl: hospital.logo_url || null };
+  } catch {
+    // Continue even if hospital info endpoint is unavailable
+  }
+  return null;
 }
 
 export const authApi = {
@@ -39,6 +50,7 @@ export const authApi = {
       username,
       password: credentials.password,
     });
+    if (credentials.mfaCode) body.set("mfa_code", credentials.mfaCode);
 
     const res = await httpClient.post(AUTH_ENDPOINTS.LOGIN, body, {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -53,8 +65,9 @@ export const authApi = {
       email: `${username}@hospital.org`,
       role: ROLES.NURSE,
       department: "ICU",
-      organization: { name: "Saint Joseph Medical Center" },
+      organization: { ...DEFAULT_ORGANIZATION },
     };
+    user.organization = (await fetchOrganization(accessToken)) ?? user.organization;
 
     return { accessToken, user };
   },
@@ -69,15 +82,7 @@ export const authApi = {
     const user = userFromToken(token);
     if (!user) throw new Error("Invalid session token");
 
-    try {
-      const hospital = await httpClient.get(AUTH_ENDPOINTS.HOSPITAL, { auth: true });
-      if (hospital?.name) {
-        user.organization = { name: hospital.name, logoUrl: hospital.logo_url || "" };
-      }
-    } catch {
-      // Continue even if hospital info endpoint is unavailable
-    }
-
+    user.organization = (await fetchOrganization()) ?? user.organization;
     return { user };
   },
 
