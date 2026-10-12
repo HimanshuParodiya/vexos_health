@@ -1,9 +1,9 @@
-import { Activity, BedDouble, LayoutDashboard, Pill } from "lucide-react";
+import { Activity, Bell, LayoutGrid, Table2 } from "lucide-react";
 import { ROUTES } from "@/config/routes";
 
 export const nurseNav = [
-  { to: ROUTES.NURSE, label: "Overview", icon: LayoutDashboard, end: true },
-  { to: `${ROUTES.NURSE}/ward`, label: "Ward", icon: BedDouble },
-  { to: `${ROUTES.NURSE}/vitals`, label: "Vitals", icon: Activity },
-  { to: `${ROUTES.NURSE}/medication`, label: "Medication", icon: Pill },
+  { to: ROUTES.NURSE, label: "Unit board", icon: LayoutGrid, end: true },
+  { to: `${ROUTES.NURSE}/flowsheet`, label: "Flowsheet", icon: Table2 },
+  { to: `${ROUTES.NURSE}/trends`, label: "Vitals trends", icon: Activity },
+  { to: `${ROUTES.NURSE}/alerts`, label: "Alerts", icon: Bell, badge: "alerts" },
 ];

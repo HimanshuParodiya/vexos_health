@@ -1,9 +1,9 @@
-import { CalendarDays, FileText, LayoutDashboard, Users } from "lucide-react";
+import { Bell, ChartLine, LayoutGrid, User } from "lucide-react";
 import { ROUTES } from "@/config/routes";
 
 export const doctorNav = [
-  { to: ROUTES.DOCTOR, label: "Overview", icon: LayoutDashboard, end: true },
-  { to: `${ROUTES.DOCTOR}/patients`, label: "My patients", icon: Users },
-  { to: `${ROUTES.DOCTOR}/appointments`, label: "Appointments", icon: CalendarDays },
-  { to: `${ROUTES.DOCTOR}/prescriptions`, label: "Prescriptions", icon: FileText },
+  { to: ROUTES.DOCTOR, label: "My patients", icon: User, end: true },
+  { to: `${ROUTES.DOCTOR}/board`, label: "Unit board", icon: LayoutGrid },
+  { to: `${ROUTES.DOCTOR}/alerts`, label: "Alerts", icon: Bell, badge: "alerts" },
+  { to: `${ROUTES.DOCTOR}/analytics`, label: "Analytics", icon: ChartLine },
 ];
